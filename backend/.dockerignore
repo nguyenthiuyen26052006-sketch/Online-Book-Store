@@ -1,0 +1,47 @@
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+*.egg-info/
+dist/
+build/
+
+# IDEs
+.vscode
+.idea
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Project
+.env
+.env.local
+.env.*.local
+*.db
+*.sqlite
+mysql_data/
+
+# Docker
+docker-compose.override.yml
+Dockerfile.dev
+
+# Git
+.git
+.gitignore
+README.md
