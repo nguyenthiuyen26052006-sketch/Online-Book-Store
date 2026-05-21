@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 import database
 import models
-from db_bootstrap import run_backup_sql_if_empty
+from db_bootstrap import drop_review_user_book_unique_constraint, run_backup_sql_if_empty
 from routers import admin, books, cart, categories, orders, reviews, super_admin, users
 
 app = FastAPI(title="Online Book Store API", redirect_slashes=False)
@@ -35,6 +35,12 @@ def on_startup():
         print("[Startup] ✓ Database tables created/verified")
     except Exception as e:
         print(f"[Startup] ✗ Error creating tables: {e}")
+        raise
+
+    try:
+        drop_review_user_book_unique_constraint(engine)
+    except Exception as e:
+        print(f"[Startup] ✗ Error migrating reviews constraints: {e}")
         raise
 
     # Nạp dữ liệu mẫu nếu DB trống

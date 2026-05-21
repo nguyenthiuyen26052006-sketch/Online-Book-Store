@@ -46,12 +46,9 @@ function LoginContent() {
     setLoading(true);
     try {
       const { user, token } = await authService.login(data);
-      
-      // Store token first
+
       localStorage.setItem('bookstore-token', token);
-      
-      // Update auth store
-      setAuth(user, token);
+      setAuth({ ...user, id: String(user.id) }, token);
       
       toast.success('Đăng nhập thành công!');
       

@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from sqlalchemy import text
+from sqlalchemy import inspect, text
+from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 from pymysql.err import IntegrityError
 
@@ -32,6 +33,42 @@ def _split_statements(sql: str) -> list[str]:
 
 def database_has_any_user(db: Session) -> bool:
     return db.query(models.User).limit(1).count() > 0
+
+
+def drop_review_user_book_unique_constraint(engine: Engine) -> None:
+    """
+    Remove legacy unique (user_id, book_id) so users can submit multiple reviews per book.
+    Primary key remains reviews.id.
+    """
+    inspector = inspect(engine)
+    if "reviews" not in inspector.get_table_names():
+        return
+
+    targets: list[str] = []
+
+    for uq in inspector.get_unique_constraints("reviews"):
+        columns = set(uq.get("column_names") or [])
+        if columns == {"user_id", "book_id"} and uq.get("name"):
+            targets.append(uq["name"])
+
+    for idx in inspector.get_indexes("reviews"):
+        if not idx.get("unique"):
+            continue
+        columns = set(idx.get("column_names") or [])
+        if columns == {"user_id", "book_id"} and idx.get("name"):
+            name = idx["name"]
+            if name not in targets:
+                targets.append(name)
+
+    for name in targets:
+        try:
+            with engine.begin() as conn:
+                conn.execute(text(f"ALTER TABLE reviews DROP INDEX `{name}`"))
+            print(f"[db_bootstrap] Dropped unique constraint/index `{name}` on reviews")
+        except Exception as exc:
+            if "check that it exists" in str(exc).lower() or "1091" in str(exc):
+                continue
+            print(f"[db_bootstrap] Could not drop `{name}` on reviews: {exc}")
 
 
 def run_backup_sql_if_empty() -> bool:

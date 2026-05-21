@@ -9,6 +9,7 @@ import {
   TrendingUp,
   CheckCircle2,
   Clock,
+  Star,
 } from 'lucide-react';
 import {
   Card,
@@ -28,6 +29,8 @@ interface DashboardData {
   completedOrders: number;
   pendingOrders: number;
   totalRevenue: number;
+  averageRating: number;
+  totalReviews: number;
 }
 
 export default function AdminDashboard() {
@@ -47,6 +50,8 @@ export default function AdminDashboard() {
           completedOrders: overview.completed_orders,
           pendingOrders: overview.pending_orders,
           totalRevenue: overview.total_revenue,
+          averageRating: overview.average_rating ?? 0,
+          totalReviews: overview.total_reviews ?? 0,
         });
       } catch (error) {
         setError(error instanceof Error ? error.message : 'Không thể tải dữ liệu');
@@ -91,6 +96,17 @@ export default function AdminDashboard() {
       color: 'from-green-500 to-green-600',
       lightColor: 'bg-green-50 dark:bg-green-950/30',
     },
+    {
+      id: 'rating',
+      title: 'Điểm trung bình (sao)',
+      value:
+        data && data.totalReviews > 0
+          ? data.averageRating.toFixed(1)
+          : 'Chưa có đánh giá',
+      icon: Star,
+      color: 'from-amber-500 to-amber-600',
+      lightColor: 'bg-amber-50 dark:bg-amber-950/30',
+    },
   ];
 
   const operations = [
@@ -131,7 +147,7 @@ export default function AdminDashboard() {
       )}
 
       {/* Key Metrics */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         {metrics.map((metric) => (
           <Card key={metric.id} className="overflow-hidden border-0 shadow-sm hover:shadow-md transition-shadow">
             <CardContent className="p-6">

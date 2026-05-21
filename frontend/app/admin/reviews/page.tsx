@@ -141,7 +141,11 @@ export default function AdminReviewsPage() {
                   {analytics.map((row) => (
                     <TableRow key={row.book_id}>
                       <TableCell className="font-medium">{row.title}</TableCell>
-                      <TableCell>{row.average_rating.toFixed(1)}</TableCell>
+                      <TableCell>
+                        {row.review_count > 0
+                          ? row.average_rating.toFixed(1)
+                          : 'Chưa có đánh giá'}
+                      </TableCell>
                       <TableCell>{row.review_count}</TableCell>
                     </TableRow>
                   ))}

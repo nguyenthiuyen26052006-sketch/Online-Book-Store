@@ -29,7 +29,14 @@ export async function apiRequest<T>(
     let message = "Request failed";
     try {
       const errorData = await response.json();
-      message = errorData.detail || message;
+      const detail = errorData.detail;
+      if (typeof detail === "string") {
+        message = detail;
+      } else if (Array.isArray(detail)) {
+        message = detail
+          .map((item: { msg?: string }) => item?.msg ?? String(item))
+          .join(", ");
+      }
     } catch {
       // Keep default message when response is not JSON.
     }

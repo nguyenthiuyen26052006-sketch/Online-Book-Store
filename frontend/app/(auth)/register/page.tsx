@@ -41,7 +41,7 @@ export default function RegisterPage() {
     try {
       const { user, token } = await authService.register(data);
       localStorage.setItem('bookstore-token', token);
-      setAuth(user, token);
+      setAuth({ ...user, id: String(user.id) }, token);
       toast.success('Đăng ký thành công!');
       router.push('/');
     } catch (error) {

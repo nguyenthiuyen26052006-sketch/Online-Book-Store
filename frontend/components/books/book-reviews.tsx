@@ -4,7 +4,6 @@ import { useCallback, useEffect, useState } from 'react';
 import { Loader2, Pencil, Star, Trash2, MessageSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Separator } from '@/components/ui/separator';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -49,7 +48,7 @@ function StarRating({
 }
 
 export function BookReviewsSection({ bookId, onReviewsChanged }: Props) {
-  const { user, isAuthenticated } = useAuthStore();
+  const { user, token, isAuthenticated } = useAuthStore();
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -89,14 +88,11 @@ export function BookReviewsSection({ bookId, onReviewsChanged }: Props) {
     load();
   }, [load]);
 
-  const myReview = user ? reviews.find((r) => r.userId === user.id) : undefined;
+  const userId = user ? String(user.id) : null;
 
-  const listReviews = reviews.filter((r) => {
-    if (!user) return true;
-    if (editingId && r.id === editingId) return false;
-    if (myReview && !editingId && r.userId === user.id) return false;
-    return true;
-  });
+  const listReviews = editingId
+    ? reviews.filter((r) => r.id !== editingId)
+    : reviews;
 
   const startEdit = (r: Review) => {
     setEditingId(r.id);
@@ -112,9 +108,8 @@ export function BookReviewsSection({ bookId, onReviewsChanged }: Props) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const authToken =
-      typeof window !== 'undefined' ? localStorage.getItem('bookstore-token') : null;
-    if (!authToken || !user) {
+    const authToken = token ?? localStorage.getItem('bookstore-token');
+    if (!authToken || !user || !userId) {
       toast.error('Vui lòng đăng nhập để đánh giá');
       return;
     }
@@ -127,14 +122,24 @@ export function BookReviewsSection({ bookId, onReviewsChanged }: Props) {
     setSubmitting(true);
     try {
       if (editingId) {
-        await reviewService.update(editingId, { rating, comment: trimmed }, authToken);
+        const updated = await reviewService.update(
+          editingId,
+          { rating, comment: trimmed },
+          authToken
+        );
+        setReviews((prev) =>
+          prev.map((r) => (r.id === updated.id ? updated : r))
+        );
         toast.success('Đã cập nhật đánh giá');
       } else {
-        await reviewService.create({ bookId, rating, comment: trimmed }, authToken);
+        const created = await reviewService.create(
+          { bookId, rating, comment: trimmed },
+          authToken
+        );
+        setReviews((prev) => [created, ...prev.filter((r) => r.id !== created.id)]);
         toast.success('Đã gửi đánh giá');
       }
       cancelEdit();
-      await load();
       await onReviewsChanged?.();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Đã có lỗi xảy ra');
@@ -144,16 +149,15 @@ export function BookReviewsSection({ bookId, onReviewsChanged }: Props) {
   };
 
   const handleDelete = async () => {
-    const authToken =
-      typeof window !== 'undefined' ? localStorage.getItem('bookstore-token') : null;
+    const authToken = token ?? localStorage.getItem('bookstore-token');
     if (!deleteId || !authToken) return;
     setSubmitting(true);
     try {
       await reviewService.delete(deleteId, authToken);
+      setReviews((prev) => prev.filter((r) => r.id !== deleteId));
       toast.success('Đã xoá đánh giá');
       setDeleteId(null);
       cancelEdit();
-      await load();
       await onReviewsChanged?.();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Không thể xoá đánh giá');
@@ -211,120 +215,81 @@ export function BookReviewsSection({ bookId, onReviewsChanged }: Props) {
       {/* ── Write / Edit Review ── */}
       {isAuthenticated ? (
         <div className="mb-10 rounded-2xl border bg-card p-6 shadow-sm">
-          {myReview && !editingId ? (
-            /* My existing review (read mode) */
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <h3 className="font-semibold text-foreground">
+              {editingId ? 'Chỉnh sửa đánh giá' : 'Viết đánh giá'}
+            </h3>
+            {!editingId && (
+              <p className="text-sm text-muted-foreground">
+                Bạn có thể gửi nhiều đánh giá cho cùng một cuốn sách.
+              </p>
+            )}
+
             <div>
-              <div className="mb-3 flex items-center justify-between gap-2">
-                <h3 className="font-semibold text-foreground">Đánh giá của bạn</h3>
-                <div className="flex gap-1.5">
-                  <Button
+              <p className="mb-2 text-sm font-medium text-muted-foreground">Xếp hạng</p>
+              <div className="flex items-center gap-1">
+                {[1, 2, 3, 4, 5].map((value) => (
+                  <button
+                    key={value}
                     type="button"
-                    variant="outline"
-                    size="sm"
-                    className="gap-1.5"
-                    onClick={() => startEdit(myReview)}
+                    onClick={() => setRating(value)}
+                    onMouseEnter={() => setHoverRating(value)}
+                    onMouseLeave={() => setHoverRating(0)}
+                    className="rounded p-0.5 transition-transform hover:scale-110"
+                    aria-label={`${value} sao`}
                   >
-                    <Pencil className="h-3.5 w-3.5" />
-                    Chỉnh sửa
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="gap-1.5 text-destructive hover:text-destructive"
-                    onClick={() => setDeleteId(myReview.id)}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                    Xoá
-                  </Button>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <StarRating value={myReview.rating} size="md" />
-                <span className="text-sm font-medium text-amber-500">
-                  {ratingLabels[myReview.rating]}
-                </span>
-                <span className="text-xs text-muted-foreground">
-                  · {formatDate(myReview.createdAt)}
-                </span>
-              </div>
-              <p className="mt-3 text-sm leading-relaxed text-foreground/80">{myReview.comment}</p>
-            </div>
-          ) : (
-            /* Write / Edit form */
-            <form onSubmit={handleSubmit} className="space-y-5">
-              <h3 className="font-semibold text-foreground">
-                {editingId ? 'Chỉnh sửa đánh giá' : 'Viết đánh giá'}
-              </h3>
-
-              {/* Star picker */}
-              <div>
-                <p className="mb-2 text-sm font-medium text-muted-foreground">Xếp hạng</p>
-                <div className="flex items-center gap-1">
-                  {[1, 2, 3, 4, 5].map((value) => (
-                    <button
-                      key={value}
-                      type="button"
-                      onClick={() => setRating(value)}
-                      onMouseEnter={() => setHoverRating(value)}
-                      onMouseLeave={() => setHoverRating(0)}
-                      className="rounded p-0.5 transition-transform hover:scale-110"
-                      aria-label={`${value} sao`}
-                    >
-                      <Star
-                        className={`h-8 w-8 transition-colors ${
-                          value <= (hoverRating || rating)
-                            ? 'fill-amber-400 text-amber-400'
-                            : 'fill-muted text-muted'
-                        }`}
-                      />
-                    </button>
-                  ))}
-                  {(hoverRating || rating) > 0 && (
-                    <span className="ml-2 text-sm font-medium text-amber-500">
-                      {ratingLabels[hoverRating || rating]}
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              {/* Comment */}
-              <div>
-                <label
-                  className="mb-2 block text-sm font-medium text-muted-foreground"
-                  htmlFor="review-comment"
-                >
-                  Nội dung
-                </label>
-                <Textarea
-                  id="review-comment"
-                  value={comment}
-                  onChange={(e) => setComment(e.target.value)}
-                  placeholder="Chia sẻ cảm nhận của bạn về cuốn sách này..."
-                  rows={4}
-                  disabled={submitting}
-                  className="resize-none"
-                />
-              </div>
-
-              <div className="flex flex-wrap gap-2">
-                <Button type="submit" disabled={submitting} className="gap-2">
-                  {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
-                  {editingId ? 'Lưu thay đổi' : 'Gửi đánh giá'}
-                </Button>
-                {editingId && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    onClick={cancelEdit}
-                    disabled={submitting}
-                  >
-                    Huỷ
-                  </Button>
+                    <Star
+                      className={`h-8 w-8 transition-colors ${
+                        value <= (hoverRating || rating)
+                          ? 'fill-amber-400 text-amber-400'
+                          : 'fill-muted text-muted'
+                      }`}
+                    />
+                  </button>
+                ))}
+                {(hoverRating || rating) > 0 && (
+                  <span className="ml-2 text-sm font-medium text-amber-500">
+                    {ratingLabels[hoverRating || rating]}
+                  </span>
                 )}
               </div>
-            </form>
-          )}
+            </div>
+
+            <div>
+              <label
+                className="mb-2 block text-sm font-medium text-muted-foreground"
+                htmlFor="review-comment"
+              >
+                Nội dung
+              </label>
+              <Textarea
+                id="review-comment"
+                value={comment}
+                onChange={(e) => setComment(e.target.value)}
+                placeholder="Chia sẻ cảm nhận của bạn về cuốn sách này..."
+                rows={4}
+                disabled={submitting}
+                className="resize-none"
+              />
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <Button type="submit" disabled={submitting} className="gap-2">
+                {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
+                {editingId ? 'Lưu thay đổi' : 'Gửi đánh giá'}
+              </Button>
+              {editingId && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={cancelEdit}
+                  disabled={submitting}
+                >
+                  Huỷ
+                </Button>
+              )}
+            </div>
+          </form>
         </div>
       ) : (
         <div className="mb-8 flex items-center gap-3 rounded-xl border border-dashed bg-muted/30 px-5 py-4">
@@ -344,9 +309,7 @@ export function BookReviewsSection({ bookId, onReviewsChanged }: Props) {
         <div className="py-12 text-center">
           <MessageSquare className="mx-auto mb-3 h-10 w-10 text-muted-foreground/40" />
           <p className="text-muted-foreground">
-            {reviews.length > 0
-              ? 'Chưa có đánh giá nào khác.'
-              : 'Chưa có đánh giá. Hãy là người đầu tiên!'}
+            Chưa có đánh giá. Hãy là người đầu tiên!
           </p>
         </div>
       ) : (
@@ -361,7 +324,14 @@ export function BookReviewsSection({ bookId, onReviewsChanged }: Props) {
                     {r.userName?.charAt(0).toUpperCase() ?? '?'}
                   </div>
                   <div>
-                    <p className="text-sm font-semibold leading-none">{r.userName}</p>
+                    <p className="text-sm font-semibold leading-none">
+                      {r.userName}
+                      {userId === r.userId && (
+                        <span className="ml-1.5 text-xs font-normal text-muted-foreground">
+                          (Bạn)
+                        </span>
+                      )}
+                    </p>
                     <p className="mt-0.5 text-xs text-muted-foreground">{formatDate(r.createdAt)}</p>
                   </div>
                 </div>
@@ -394,7 +364,7 @@ export function BookReviewsSection({ bookId, onReviewsChanged }: Props) {
               )}
 
               {/* Owner actions */}
-              {user?.id === r.userId && (
+              {userId === r.userId && (
                 <div className="mt-3 flex gap-1 pl-12">
                   <Button
                     type="button"

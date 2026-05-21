@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Column, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import Column, DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import relationship
 
 from database import Base
@@ -111,7 +111,7 @@ class OrderItem(Base):
 class Review(Base):
     __tablename__ = "reviews"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     book_id = Column(Integer, ForeignKey("books.id"), nullable=False, index=True)
     rating = Column(Integer, nullable=False)

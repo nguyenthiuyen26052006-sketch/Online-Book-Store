@@ -213,6 +213,17 @@ async def get_overview_stats(
         or 0
     )
     active_users = 0
+    review_stats = (
+        db.query(
+            func.coalesce(func.avg(models.Review.rating), 0.0),
+            func.count(models.Review.id),
+        )
+        .join(models.Book, models.Book.id == models.Review.book_id)
+        .filter(models.Book.admin_id == current_admin.id)
+        .first()
+    )
+    average_rating = round(float(review_stats[0] or 0), 2) if review_stats else 0.0
+    total_reviews = int(review_stats[1] or 0) if review_stats else 0
 
     return {
         "total_books": total_books,
@@ -222,6 +233,8 @@ async def get_overview_stats(
         "completed_orders": completed_orders,
         "pending_orders": pending_orders,
         "total_revenue": float(total_revenue),
+        "average_rating": average_rating,
+        "total_reviews": total_reviews,
     }
 
 

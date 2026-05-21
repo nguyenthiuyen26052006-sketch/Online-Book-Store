@@ -1,5 +1,4 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
 import models
@@ -23,7 +22,7 @@ def serialize_review(review: models.Review) -> schemas.ReviewOut:
     return payload
 
 
-@router.post("/", response_model=schemas.ReviewOut, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=schemas.ReviewOut, status_code=status.HTTP_201_CREATED)
 async def create_review(
     body: schemas.ReviewCreate,
     db: Session = Depends(get_db),
@@ -40,14 +39,6 @@ async def create_review(
         comment=body.comment.strip(),
     )
     db.add(review)
-    try:
-        db.flush()
-    except IntegrityError:
-        db.rollback()
-        raise HTTPException(
-            status_code=400,
-            detail="You have already reviewed this book",
-        )
     db.commit()
     review = (
         db.query(models.Review)
@@ -78,8 +69,6 @@ async def update_review(
 
     review.rating = body.rating
     review.comment = body.comment.strip()
-    bid = review.book_id
-    db.flush()
     db.commit()
     review = (
         db.query(models.Review)
@@ -102,7 +91,5 @@ async def delete_review(
     if review.user_id != current_user.id and current_user.role not in {"admin", "super_admin"}:
         raise HTTPException(status_code=403, detail="You can only delete your own reviews")
 
-    book_id = review.book_id
     db.delete(review)
-    db.flush()
     db.commit()

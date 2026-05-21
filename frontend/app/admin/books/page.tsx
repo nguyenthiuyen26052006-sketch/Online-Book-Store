@@ -59,6 +59,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { bookService } from '@/services/book.service';
 import { categoryService } from '@/services/category.service';
+import { adminService } from '@/services/admin.service';
 import { bookSchema, type BookFormData } from '@/validators';
 import { formatCurrency } from '@/utils/helpers';
 import type { Book, Category } from '@/types';
@@ -76,6 +77,9 @@ export default function AdminBooksPage() {
   const [deletingBook, setDeletingBook] = useState<Book | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [ratingByBookId, setRatingByBookId] = useState<
+    Record<string, { average: number; count: number }>
+  >({});
 
   const {
     register,
@@ -91,12 +95,21 @@ export default function AdminBooksPage() {
     setLoading(true);
     try {
       setError(null);
-      const [booksRes, catsRes] = await Promise.all([
+      const [booksRes, catsRes, analytics] = await Promise.all([
         bookService.getMine(),
         categoryService.getAll(),
+        adminService.getBookReviewAnalytics(),
       ]);
       setBooks(booksRes);
       setCategories(catsRes);
+      const ratings: Record<string, { average: number; count: number }> = {};
+      for (const row of analytics) {
+        ratings[String(row.book_id)] = {
+          average: row.average_rating,
+          count: row.review_count,
+        };
+      }
+      setRatingByBookId(ratings);
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Không thể tải dữ liệu');
     } finally {
@@ -423,7 +436,15 @@ export default function AdminBooksPage() {
                       <TableCell>
                         <div className="flex items-center gap-1">
                           <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                          <span>--</span>
+                          <span>
+                            {(() => {
+                              const stats = ratingByBookId[book.id];
+                              if (!stats || stats.count === 0) {
+                                return 'Chưa có đánh giá';
+                              }
+                              return stats.average.toFixed(1);
+                            })()}
+                          </span>
                         </div>
                       </TableCell>
                       <TableCell className="text-right">

@@ -24,6 +24,8 @@ export type AdminOverviewStats = {
   completed_orders: number;
   pending_orders: number;
   total_revenue: number;
+  average_rating: number;
+  total_reviews: number;
 };
 
 export type AdminOrderStats = {

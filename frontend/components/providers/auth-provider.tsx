@@ -35,7 +35,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           // If we have a token but auth store isn't loaded yet, try to fetch user profile
           try {
             const userProfile = await authService.getProfile(storedToken);
-            setAuth(userProfile, storedToken);
+            setAuth({ ...userProfile, id: String(userProfile.id) }, storedToken);
           } catch (error) {
             // Token is invalid, clear it
             localStorage.removeItem('bookstore-token');
